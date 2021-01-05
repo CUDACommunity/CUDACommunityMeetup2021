@@ -1,0 +1,1012 @@
+Welcome:
+
+First of all thank you all for joining our meeting.
+
+I frankly think that CUDA community requires more discussions, because there are alot of subtle 
+corners in CUDA that affects both performance and safety. 
+
+Today I'll try to bring some light into one of these corners. And I'd like you to do the same.
+
+Feel free to suggest yourself as a speaker in our discord channel if you have anything to share.
+
+
+
+Organization:
+
+So, before we start, I'd like to discuss a few organizational questions. I'll be recording this presentation.
+Therefore, if you have questions - I'll answer them after the presentation.
+
+I'm going to turn off the recording as soon as the presentation ends, so feel free to discuss any CUDA related questions afterwards.
+
+Besides, our meeting will last as long as we have subjects to discuss. So don't hurry to disconnect. 
+
+Also, I'd like to point out that you don't have to have your video on, or talk if you don't want to. 
+
+After this short message I'm finally ready to start my presentation.
+
+
+Presentation:
+
+[1]
+
+Today I'm going to talk about CUDA memory model. 
+
+You can successfully use CUDA without considering its memory model as long each thread accesses
+memory assigned to it. But if different threads access same memory address and at least 
+one of them write to it, you'll need to emerge yourself into CUDA memory model.
+
+In other words, memory model is all about guarantees you have while accessing shared memory from multiple threads. 
+
+
+[2]
+
+
+If you use memory model guarantees correctly you can get significant performance improvemets. During this talk I'll show
+an example of over than 40% runtime improvement thanks to memory model understanding. 
+
+The second motivation for this subject is safety.
+
+If you don't understand the guarantees given by memory model - you are risking to produce 
+non-determenistic concurrency bug, which might not show itself for a thousand of executions. I'll discuss an
+example of data race that happens only few times over one hundred thousand executions.
+
+
+[3]
+
+I've tried to make my talk rather pragmatic, 
+so you can get a common sense of performance benefits along with safety issues.
+
+However, I have to mention some definitions that you'll need later.
+
+Let's start simple, a memory operation is a read or write.
+
+And memory model defines how memory operations on shared memory are processed. 
+
+By the way, I use shared memory in general meaning, in other words shared memory 
+is a memory that can be accessed by different threads. 
+So don't confuse it with CUDA's scratchpad memory that is also called shared.
+
+Anyway, different memory models provide different guarantees to a developer. 
+
+These guarantees, in their turn, can prevent a hardware from some optimizations. 
+
+So, it's possible to have a piece of hardware that implements quite an intuitive 
+memory model but is restricted by this model to perform poorly.
+
+
+[4]
+
+
+Regarding intuitive models, the absolute winner is sequential consistency memory model. 
+
+I'll consider it here so as to expose CUDA memory model through its differences with something intuitive.
+
+Anyway, sequential consistency guarantees that memory operations can't be reordered with respect to program order.
+
+Let's consider this simple multi-threaded program. 
+
+Variables x and y are initialized to zero beforehand. 
+
+First thread writes 1 to x and then reads y.
+
+Second thread writes 1 to y and then reads x.
+
+
+[5]
+
+For the first thread sequential consistency guarantees that the write to x happens before the read of y in all
+possible executions of this program.
+
+Here is the illustration of these executions. 
+
+Sequential consistency can be formalized with the equation above. This equations states that
+for memory operation A that is placed before operation B in thread's program
+order it's guaranteed that A is placed before B in memory order.
+
+In fact, with sequential consistency it's impossible for both r1 and r2 to be zero.
+
+
+If you haven't emerged yourself into memory models yet, you might think that it's the only possible way
+for hardware to behave.
+
+
+[6]
+
+In this case, I have a different memory model for you, and it's one step closer to CUDA memory model. 
+
+In fact, Most modern CPUs implement it. These CPUs contain FIFO store buffers.
+
+Stores to buffer hide memory latency which affects performance.
+
+
+[7]
+
+So in our previous example the reads can start immediately after putting writes into buffers.
+
+But how does this hardware optimization affects sequential consistency?
+
+
+[8]
+
+As you can see from the illustration on the slide - now it is possible to have both r1 and r2 equal to zero.
+
+In other words, store buffers violate sequential consistency in one particular case - load after store.
+
+Store after store can't be reordered because store buffers are required to be FIFO.
+
+Any memory operation after load can't be reordered because it will wait till load completion.
+
+The memory model 
+that allows loads placed after stores in program order 
+to be reordered in memory order is called Total Store Order.
+
+But what is program order anyway?
+
+
+[9]
+
+Let's examine this particular example. 
+
+I assign the sum of y and 1 to x and then store zero to y.
+
+If you compile this code with flags on slide, you'll get assembly from the right.
+
+So what is going on in this assembly. Y is stored into eax register in the first line.
+
+Then Y is set to zero in the second line.
+
+But it's not what I've written!
+
+Obviously, order of expressions in C++ is not a program order. The final assembly is.
+
+
+[9]
+
+Fortunately, we can force compiler to produce assembly that matches our intents. 
+
+Inline assembly in line 2 is called compiler barrier, and it helps to think about high-lever
+language in terms of program order.
+
+<< SENT TILL THIS LINE >>
+
+[10]
+
+In order to understand how often load after store reordering happens I wrote this code.
+
+As you can see I prevented compile time reorderings with compiler barriers.
+
+The test runs this program one hundred thousand times and counts number of load after store violations.
+
+
+[11]
+
+Here is the histogram of results gathered over one hundred thousand executions of the test.
+
+The minimal violations count over all runs was about 2% of iterations.
+
+The maximal - about 99% of iterations. 
+
+I hope this histogram convinced you that hardware reordering is not a rare event.
+
+
+[12]
+
+There is a way to forbid load after store reordering by placing memory fence. 
+
+It's kind of compiler barrier that we've seen before, but it operates at hardware level.
+
+With hardware barrier there was no load after store reorderings at all.
+
+It's important to understand that hardware barrier also acts as software barrier, but not vice versa.
+
+Anyway, at this point we've become acquainted with software and hardware CPU barriers, program order and operations reordering.
+
+With mentioned concepts we are finally ready to talk about GPUs. 
+
+
+[13]
+
+GPUs utilize variety of hardrare optimizations to increase bandwidth. 
+
+This optimizations come at cost of memory ordering. 
+
+If memory model guarantees only ordering around fence - it's called weak. 
+
+And as you might've guessed from the subtitle of this talk, CUDA provides a weak memory model.
+
+On the slide you can see a formal expression of what I've just said. 
+
+If memory operation is placed before fence in program order, than it'll be before fence in memory order.
+
+If fence is placed before memory operation in program order, than it'll be before this operation in memory order.
+
+
+
+[14]
+
+To expose memory model weakness let's consider this example. 
+
+Writer stores values to four variables.
+
+Other threads load this variables and check for load order violations. 
+
+
+[15]
+
+I'm searching for the case where stores to first and third variables are observed but stores to second and fourth - aren't.
+
+As you remember, this kind of reordering was impossible in TSO because store buffer is FIFO.
+
+Do you think it's possible to observe a reordering of this kind? If yes - why it happens?
+
+I mean, is it because CUDA was ment to be confusing? I suggest you to think about optimization opportunities that can be
+
+taken if this reordering is allowed. 
+
+
+[16]
+
+While you have this background thought, I'll show you the results. 
+
+Yes, reordering of this kind happens alot, more than 60% of iterations observed reordering on my 3090. 
+
+It's about time we returned to the question why.
+
+
+[17]
+
+If you don't have any thoughts - I'll give you a clue. If first two variables are placed in one memory segment - there 
+
+is no reordering observed. But if first and third variables are placed in one segment - the reordering happens almost every time.
+
+
+[18]
+
+In order to understand this behaviour we need to look at FIFO write bufer closer.
+
+Before writer issues any instructions, there is no entry in write buffer.
+
+
+[19]
+
+After issuing the first write, we have new single-word entry in the write buffer.
+
+
+[20-22]
+
+And after issuing the last instruction the write buffer looks like that.
+
+In other words, with FIFO write buffer writes will occur in thread order.
+
+
+[23]
+
+On the other hand, each entry in a merging write buffer correspond to cache block.
+
+
+[24]
+
+Writing to first wariable fills part of first entry in mergin write buffer.
+
+
+[25]
+
+Second write will fill the second entry, just like before. 
+
+
+[26]
+
+And here is something interesting. Third write will fill part of the first entry.
+
+The first entry in the write buffer will be written before the second one. 
+
+
+[27]
+
+That means that second and fourth variables will be written after the first and third ones, just like we've seen in
+
+the litmus test before.
+
+
+
+[28]
+
+We can fix this ordering issue with hardware memory fences. 
+
+In CUDA, memory fence can be placed by calling threadfence function.
+
+Ok, but what about performance.
+
+
+[29]
+
+The version with fences slows down our simple test by 8%. 
+
+Anyway, if you think that this reordering isn't exciting enough, I think that the next one will blow your mind.
+
+
+[30]
+
+Let's focus on the else branch for a while.
+
+There are two reads from the scratchpad memory. 
+
+I use reordering arrays filled with zeroes, so as to prevent compiler optimizations.
+
+Effectivly, I read the same address twice. 
+
+First thread writes 1 to scratchpad memory.
+
+The question is - is it possible for this reads to reorder?
+
+
+[31]
+
+Here is the illustration of what I'm looking for. 
+
+
+[32]
+
+Well.. it happens quite a few times on my Fermi GPU. 
+
+This behaviour is considered to be a bug. It's fixed in Maxwell. 
+
+But the origin of this issue is quite interesting anyway. 
+
+In order to optimize bank conflicts, hardware splits the sets of non-conflicting addresses into groups.
+
+This optimization makes it possible for two loads of one thread to be reordered if the first load encounters a conflict 
+coming from another thread. 
+
+In other words, it would be quite difficult to find this bug.
+
+
+[33]
+
+Let's consider a more usefull example. 
+
+One thread fills data and set flag to one afterwards. 
+
+Other threads spin on this flag and then read data.
+
+This pattern is quite common, it's called message passing.
+
+
+[34]
+
+Writer code assembly looks fine, it stores one to the flag after all writes to data.
+
+
+[35]
+
+But there is something interesting about reader's assembly.
+
+It loads flag, then jumps to L1 label and spins there forewer unless flag is true.
+
+Obviously, this program never ends in most executions. But why CUDA compiler did this?
+
+That's because L1 cache isn't coherent. 
+
+That means that if the value get there, it won't change no mater how many times you read it.
+
+So compiler optimized this code by removing reads of flag. This optimization doesn't change the behaviour of program anyway.
+
+
+[36]
+
+We can partially fix this by using volatile keyword on flag variable. 
+
+Volatile forces the compiler to load variable each time it's referenced. 
+
+It also forbid hardware to put the value into L1 cache.
+
+Anyway, with this change assembly looks better. 
+
+It spins on reading flag until it's equal to zero and then reads the data.
+
+It's about time we remembered about hardware reorderings.
+
+
+[37]
+
+Here you can see a histogram of message passing violations. 
+
+For different data size I got different results. 
+
+For thouthand iterations I haven't seen any reorderings for the input data size of 1 and 8.
+
+It doesn't mean that you can omit fences in this case. 
+
+As I've shown before, memory reordering is a function of both memory locations and work load.
+
+Let's fix this test.
+
+
+[38]
+
+By placing memory fences after writes to data we ensure that these memory operations are observable by different threads.
+
+After that we can safely set flag to 1.
+
+I also should add fence to readers. Without fence there are no guarantees that the data isn't cached in L1 which isn't coherent.
+
+
+[39]
+
+Ok, does it mean that your only option is to use threadfence with every possible memory ordering issue?
+
+Fortunately there are other options.
+
+
+[40]
+
+For example, we can force reads to bypass L1. With inline assembly on the top of the slide it's possible to load directly from
+
+coherent L2 cache. As you can see, writer code didn't change. I've removed threadfence and replaced direct load to load that
+
+bypass L1 cache.
+
+
+[41]
+
+This version is faster. The average speedup is about 8 percent if the message size is one int.
+
+I've called the version without fence controversial because there are no official guarantees regarding loads order.
+
+I haven't managed to find anything about this subject, so I desided to ask Olivier Giroux [Olivie Giru], 
+who is an architect an NVIDIA, about safety of such an optimization.
+
+
+[42]
+
+With his permission, I quote his answer here.
+
+He said:
+``It’s possible to break the dependency order between the flag load and the later, dependent ld.cg load,
+  that makes your test pass. Because it’s possible to write a program that breaks this order,
+  it’s not possible for us to write a memory model that says the order is enforced.''
+
+
+[43]
+
+Besides possibility to break the ordering, if you pass bigger messages - you'll get significant slowdown.
+
+But, why? So, the reason for this slowdown is L1 cache. 
+
+Optimized version omits fence after spinloop at cost of direct L2 loads.
+
+On the other hand, the version with fence, flashes L1 right after spin loop, but after first load of data
+
+the code enjoys reading from L1, which is faster.
+
+
+To sum up, direct L2 loads can be used for small message passing optimization, but there is a way to break code. 
+
+I'm going to show you both faster and safer way for the case of small message passing.
+
+
+[44]
+
+The fence can be eliminated if the status flag and the data can be combined into a single architectural word.
+
+That is, instead of enforcing memory operations ordering, we could procude a single memory operation for both flag and data.
+
+
+[45]
+
+Here I introduce union for flag and data that are stored as a single int64 value.
+
+As you can see I write data to global memory by assigning int64 vec. 
+
+If you are bound to use 64 bit data, you can use 128-wide words instead.
+
+
+[46]
+
+This approach gives us another 30 percent speedup. 
+
+That means that you don't have to be like that guy with a flex tape.
+
+The plot that you are looking at could be considered quite synthetic. 
+
+So let's put this knowledge into practice.
+
+
+[47]
+
+To test everything I said on real-world code, I'm going to optimize scan algorithm.
+
+Scan is an algorithm that produces a sequence where each element is computed to be the reduction of the elements occuring 
+
+earlier in the input sequence. 
+
+You can see a serial implementation of scan on the slide.
+
+There is a variety of algorithms that implements thread-block scan on GPU.
+
+What I'm interested in is GPU-wide scan implementation. 
+
+
+[48]
+
+Let's consider the example on the slide. 
+
+There are three thread blocks. Each block is assigned to process two elements from input array.
+
+We can write a result of partial scans of each block into output array. 
+
+To produce a final result, we need to somehow combine this partial results.
+
+
+[49]
+
+Let's compute a reduction within each block and write the result into separate array.
+
+
+[50]
+
+After that we can compute inclusive scan on this array.
+
+
+[51]
+
+Now we can take the result of inclusive scan of previous block. 
+
+This value represents the sum that we need to add to our partial result to produce final output array.
+
+
+[52]
+
+In code it could looks like this. 
+
+First kernel computes partial scan array and write per-block sums into helper buffer.
+
+Then I compute prefix sum of the helper buffer,
+and finally adjust values in output arrays.
+
+Putting the code into separate kernels provides us with some guarantees about memory ordering.
+
+In other words, 
+if the second kernel starts, 
+all the thread blocks will have written their partial results into the helper buffer.
+
+
+[53]
+
+As you can see, this approach lacks performance. 
+
+That's due to the fact that the code needs to read and write the data twice. 
+
+The code reads input data and write partial results of the same size.
+Then it reads partial results, adjust values and write it back.
+
+In some books you can find the solution to the issue with extra memory traffic. 
+The solution is to wait for the previous thread block to write sum into memory, and 
+then adjust blocks values within one kernel launch.
+
+
+[54]
+
+Let's look at the code. It loads thread_data_size values into each thread. 
+
+Then performs reduction within block
+
+
+[55]
+
+Here comes the interesting part. 
+
+First block writes result immediately. 
+
+Other blocks spin on the flag of previous block.
+
+When the result of the previous block is observable, the result of current block is added to the 
+partial sum. The result is written to the global memory in order to release subsequent blocks from spinning.
+
+
+
+[56]
+
+Then the code performs final scan and write the results into global memory.
+
+
+[57]
+
+And.. this code performs even worse that the one with three kernels. 
+
+
+[58]
+
+We can actually remove any operations except message passing to find out that the time almost is
+equal to the message passing itself. But the books told us that it was better. 
+
+Maybe something is wrong with my 3090?
+
+
+[59]
+
+Here you can see how different GPUs perform this message passing benchmark. 
+
+Clearly, there is nothing wrong with my 3090. The problem is in the serialization of thread blocks.
+
+The latency of message passing between blocks is too big to optimize the scan like that.
+
+
+Fortunately, NVIDIA came with a solution. 
+
+Instead of waiting for the previous block, let's gather partial results of previous blocks until we find final result.
+
+I'll describe this approach in ditails.
+
+
+[60]
+
+Now the flag can take two states. If the flag is in the first state - it means that the block has computed the final result.
+
+If the flag is in the second state - it means that the block has computed only partial result. 
+
+The first thread block writes the final results immediately after computing it.
+
+
+[61]
+
+Other blocks write partial results immediately.
+
+Then the first warp of each block searches for the final result as following.
+
+
+[62]
+
+Each thread of the first warp spins on it's block.
+
+
+[63]
+
+If only the partial sums are written, we continue deeping into results of even further blocks.
+
+If one of the previous blocks is in its final state, the threads of warp vote to find the closest block with final result.
+
+
+[64]
+
+Then the warp computes warp reduce, to find the final sum of previous block results.
+
+
+[65]
+
+Just like before, the code adjust the results of a thread and writes it to the memory.
+
+
+[66]
+
+Now we get the improvement over the version with three kernels.
+
+The code performs on the speed of memory copying. That means that it can't be further improved.
+
+
+[67]
+
+I've recorded how many cycled each block spent in the spin loop in the previous version.
+You can see that each block executes more that a thouthand iterations before getting the result of the previous block.
+
+
+
+[68]
+
+With decoupled lookback the first warp of each thread spins a few iterations and then goes deeper into block states array.
+
+In average, each warp goes deeper into the array only four times. That means that a warp examines 128 blocks in average.
+
+
+[69]
+
+In the implementation of decoupled look back I've used single-word approach. 
+
+If you replace it with the fences, you'll get 23% performance degradation. 
+
+So this approach performs better in real-world programs as well.
+
+
+[70]
+
+If you open the PTX memory consistency model documentation, you'll find a description of release/acquire patterns.
+
+The first pattern is quite similar to the first version of message passing implementation that we've discussed.
+
+Release pattern consists of memory fence followed by a strong write.
+
+Acquire pattern consists of strong read followed by a memory fence.
+
+What strong operation is anyway?
+
+
+[71]
+
+It's about time we returned to the definitions.
+
+
+[72]
+
+A strong operation is a memory operation with a relaxed, acquire, release, or volatile quialifier.
+
+This qualifiers exist in the PTX assembly. 
+
+For example, 
+if you mark some variable as volatile, 
+memory operations on it will be compiled into a load or a store with volatile qualifier.
+
+But what about other qualifiers? You can actually use them with inline assembly.
+
+
+[73]
+
+Here is the second release/acquire pattern from the documentation.
+
+I've written wrappers for the release and aquifre quialifiers.
+
+The documentation states,
+that you can get a release/acquire pattern by using release operation on the writer's side
+and the aqcuire operation on the reader's side.
+
+You might be wondering, how is it possible to have a memory ordering without memory fences?
+
+
+[74]
+
+In reality, there is no magical instruction qualifiers.
+
+If you compile a write with release qualifier
+you'll simply get an membar and a strong write. Just like we did with threadfence and volatile variable.
+
+On the reader's side the acuire qualifier will be compiled into a strong read followed by a cache invalidation instruction.
+
+
+[75]
+
+The new libcu++ library relies on this instructions, but provides a better syntax.
+
+We could change the flag type to libcu++ atomic and forget about memory fences and volatile keyword.
+
+To show an example of this new library I'll show another optimization opportunity.
+
+
+[76]
+
+This time I'll write a single-kernel reduction. 
+
+Reduction is an algorithm that returns the last value from the output of scan.
+
+
+[77]
+
+If you are bound to have run-to-run tereminism, you'll need to store per-block values and reduce them later.
+
+The common approach is to write intermediate results into helper buffer and then run a single block to reduce it.
+
+We could remove the second kernel call by asking the last block to reduce the helper buffer. 
+
+I don't expect this optimization to change the performance alot, but it'll be possible to
+show a few more useful conecpts here.
+
+
+[78]
+
+The only difference with a two-kernel approach is in the end of kernel. 
+
+First thread of each thread block writes it's partial result, perform threadfence and increment counter.
+
+If the current thread block is last, it performs a final reduction.
+
+It's important to note that atomic operations don't imply memory ordering, that's why we stil need a fence here. 
+
+Also, atomic operation is classified as a strong one, so you don't need to mark the counter volatile.
+
+
+[79]
+
+I got an average speedup of single-kernel approach around 4 percent. 
+
+Let's try to use libcu++ on this task.
+
+
+[80]
+
+So, with atomics, provided by libcu++ we can modify the code as follows. 
+
+Now it's difficult to remove threadfence, because it's embeded into the fetch_add method.
+
+
+[81]
+
+And.. something is wrong here. 
+
+
+[82]
+
+The problem is that there are different atomics. 
+
+What I needed was an atomic with GPU scope. 
+
+
+[83]
+
+After changing the type of atomic, the performance matches handwritten code.
+
+
+[84]
+
+To demonstrate the a few more features let's consider the following problem. 
+
+We have a 2 dimensional grid. One of the cells of the grid contains sensor.
+
+We need to perform some computations until the sensor is triggered.
+
+I don't want to download data from GPU to deside upon continuation of iterations.
+
+To illiminate extra latency, let's orginize the code as a persistent kernel. 
+
+
+[85]
+
+In order to stop all threads, we need to pass some flag from one thread to all others.
+
+Effectivly it's a broadcast problem.
+
+
+[86]
+
+To have a reference, let's pretend that the sensor is in each cell and it is triggered simultaneusly.
+
+The code perform some computation on line 9, and if the result is greater than the threshold, the iterations are stopped.
+
+
+[87]
+
+In order to leave only one sensor, we need to modify the code as follows.
+
+Sensor owner check it's result and store the flag and the current iteration number.
+
+Reader threads load the data and spins until their iteration number is greater or equal to writer's one.
+
+
+[88]
+
+Because of the enormous contention on the flag, elapsed time is significantly distributed.
+
+To analyze performance, I'll use probability density plots.
+
+As you can see from the plot the difference between two version is significant.
+
+Before optimization let's introduce a hypothesis. 
+
+I presume, that the source of poor performance is in high contention.
+
+
+[89]
+
+We can reduce contantion by allowing only main threads of each thread block to spin on the flag.
+
+The main thread of thread block broadcasts the flag through scratchpad memory afterwards.
+
+
+[90]
+
+If the grid is partitioned as on the slide.
+
+
+[91]
+
+We'll get the communication pattern like this.
+
+The number of memory accesses should be reduced by a factor equal to a size of the thread block.
+
+
+[92]
+
+The performance of the new version is much closer to our reference.
+
+I think that our premise was correct. 
+
+The performance is limited due to a high contention.
+
+If that is the case, can we reduce contantion even further?
+
+
+[93]
+
+Fortunately we can.
+
+Since volta there is an instrinsic that suspends the thread for a while.
+
+The instrinsic usage is illustrated on the line 6. 
+
+An argument of the intrinsic is a sleep duration in nanoseconds.
+
+
+[94]
+
+And here are performance results. 
+
+Although the improvement was quite naive we got a significant difference in performance.
+
+As you know, there are general practices for spinlock optimizations.
+
+For example, we can spin without nanosleep for a limited number of iterations.
+
+This modification might reduce latency at cost of increased contention.
+
+
+[95]
+
+Fortunately, there is an implementation like that in libcu++.
+
+Here I show a change in code of the sensor owner. 
+
+I've changed the type of the flag. 
+
+It's libcu++ atomic with a device scope now.
+
+The sensor owner use store method with relaxed memory order.
+
+
+[96]
+
+The readers use wait method. 
+
+This method spins until the value is equal to the first argument.
+
+For some reason it returns void, so we have to implicitly load new value afterwards.
+
+
+[97]
+
+Unfortunately, our hand-written version of wait was more efficient.
+
+
+[98]
+
+At first I thought that the reason is in the extra load after wait method call.
+
+I've changed the wait implementation so as to return a last loaded value. 
+
+But this modification was insignificant.
+
+
+
+[99]
+
+So I removed a part of fast reads from the wait method.
+
+As you can see it was a reason of slowdown.
+
+It seems that it's unrealistyc to implement both optimal and general spinloop.
+
+I've shown this example to demonstrate that the pattern of memory accesses should significantly affect your decisions.
+
+In this particular example, any latency optimization on spinloop increased contention and reduced performance.
+
+So, the main rule of performance optimization holds - always measure.
+
+
+[100]
+
+If you've red my last blog post, you know that I can't help mentioning the multi-GPU context.
+
+
+[101]
+
+The common scheme of multi-gpu systems is shown on the slide. 
+
+
+[102]
+
+As you can see, the data path go through second GPU coherent L2 cache. 
+
+That means that our code works just fine when it's lounched on GPU-local data with the flag allocated on one of the GPUs.
+
+
+[103]
+
+All previous conclusions are valid in multi-GPU environment.
+
+

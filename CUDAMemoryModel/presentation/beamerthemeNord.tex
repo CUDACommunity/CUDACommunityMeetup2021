@@ -1,0 +1,178 @@
+% Copyright 2020 by Junwei Wang <i.junwei.wang@gmail.com>
+%
+% This file may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.3c
+% of this license or (at your option) any later version.
+% The latest version of this license is in
+%   http://www.latex-project.org/lppl.txt
+
+\documentclass[compress]{beamer}
+
+\usepackage[english]{babel}
+\usepackage{metalogo}
+\usepackage{listings}
+\usepackage{fontspec}
+\usepackage{tikz}
+
+\usetheme{Nord}
+% \usetheme[style=light]{Nord}
+
+\setmainfont{Yanone Kaffeesatz}
+\setsansfont{Andika New Basic}
+\setmonofont{DejaVu Sans Mono}
+
+\AtBeginSection[]
+{
+  \begin{frame}[c,noframenumbering,plain]
+    \tableofcontents[sectionstyle=show/hide,subsectionstyle=show/show/hide]
+  \end{frame}
+}
+
+\AtBeginSubsection[]
+{
+  \begin{frame}[c,noframenumbering,plain]
+    \tableofcontents[sectionstyle=show/hide,subsectionstyle=show/shaded/hide]
+  \end{frame}
+}
+
+\title{Beamer Theme ``Nord''}
+\subtitle{A simple beamer theme that uses ``Nord'' color scheme}
+\author{Junwei Wang}
+\institute{CryptoExperts}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}[plain,noframenumbering]
+  \maketitle
+\end{frame}
+
+
+\section{Appearance}
+
+
+\begin{frame}[fragile]
+  \frametitle{Usage}
+  Simply include the following code in your preamble:
+
+  \begin{lstlisting}[basicstyle = \ttfamily\small]
+\usetheme{Nord}
+  \end{lstlisting}
+
+  \bigskip
+
+  By default, the appearance is in dark theme, however you can actively choose a either a light or a
+  dark theme.
+
+  \begin{lstlisting}[basicstyle = \ttfamily\small]
+\usetheme[style=light]{Nord}
+\usetheme[style=dark]{Nord}
+  \end{lstlisting}
+
+\end{frame}
+
+\subsection{Colors}
+
+\begin{frame}{Defined Colors}{This is a subtitle}
+  \begin{description}[Snow Storm]
+  \item[Polar Night]
+    \textcolor{NordDarkBlack}{NordDarkBlack} \quad \textcolor{NordBlack}{NordBlack}\\
+    \textcolor{NordMediumBlack}{NordMediumBlack} \quad \textcolor{NordBrightBlack}{NordBrightBlack}
+  \item[Snow Storm]
+    \textcolor{NordWhite}{NordWhite} \quad \textcolor{NordBrighterWhite}{NordBrightestWhite}\\
+    \textcolor{NordBrightestWhite}{NordBrightestWhite}
+  \item[Forest]
+    \textcolor{NordCyan}{NordCyan} \quad \textcolor{NordBrightCyan}{NordBrightCyan}\\
+    \textcolor{NordBlue}{NordBlue} \quad \textcolor{NordBrightBlue}{NordBrightBlue}
+  \item[Aurora]
+    \textcolor{NordRed}{NordRed} \quad \textcolor{NordOrange}{NordOrange} \\
+    \textcolor{NordYellow}{NordYellow} \quad \textcolor{NordGreen}{NordGreen} \\
+    \textcolor{NordMagenta}{NordMagenta}
+  \end{description}
+\end{frame}
+
+\subsection{Fonts}
+
+\begin{frame}[fragile]{Recommended Free Fonts}
+  \begin{description}[Selected Fonts]
+  \item[Selected Fonts] recommended for this theme\\
+    \begin{lstlisting}[basicstyle = \ttfamily\small]
+\setmainfont{Yanone Kaffeesatz}
+\setsansfont{Andika New Basic}
+\setmonofont{DejaVu Sans Mono}
+    \end{lstlisting}
+  \item[Download] {\small \url{https://www.fontsquirrel.com/}}
+  \item[Install Fonts] {\small \url{https://www.google.com/get/noto/help/install/}}
+  \item[Compilation] compile with \XeLaTeX~to use system-wide fonts
+  \end{description}
+
+\end{frame}
+
+
+\subsection{Blocks}
+
+\begin{frame}
+  \frametitle{Blocks}
+  \begin{block}{This is a Block}
+    \[
+      a^2 + b^2 = c^2
+    \]
+  \end{block}
+  \begin{exampleblock}{This is an Example Block}
+    \[
+      E = m \cdot c^{2}
+    \]
+  \end{exampleblock}
+  \begin{alertblock}{This is an Alert Block}
+    \[
+      e^{i\pi} + 1 = 0
+    \]
+  \end{alertblock}
+
+  \centering
+  \begin{minipage}{1.0\linewidth}
+    \begin{block}{Horizontally-Aligned Block}
+      \[
+        \log xy = \log x + \log y
+      \]
+    \end{block}
+  \end{minipage}
+\end{frame}
+
+\subsection{Items}
+
+\begin{frame}{Items}
+  Itemize
+  \begin{itemize}
+    \item item 1
+    \item item 2
+  \end{itemize}
+
+  \bigskip
+
+  Enumerate
+  \begin{enumerate}
+    \item item 1
+    \item item 2
+  \end{enumerate}
+\end{frame}
+
+\subsection{Figures}
+
+\begin{frame}{Figures}
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}
+      \draw [help lines,NordMagenta,very thick] (0,0) grid (5,4);
+    \end{tikzpicture}
+    \caption{Credits to Ti\textit{k}Z}
+  \end{figure}
+\end{frame}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% TeX-engine: xetex
+%%% End:

@@ -1,0 +1,23 @@
+Hello CUDA community,
+
+We're happy to announce our first online meetup! 
+On January 4th we'll talk about CUDA memory consistency model and more.
+We will add a link to the Zoom meeting closer to the event so stay tuned.
+
+Speaker:
+Georgy Evtushenko
+
+Abstract:
+The main source of non-deterministic concurrency bugs is a misunderstanding of the 
+memory consistency model. If you don't understand the guarantees given by memory model,
+you are risking to produce a bug, which might not show itself for a thousand of executions.
+Moreover, if you use memory model guarantees correctly you can get significant performance improvements. 
+During this talk I'll show an example of over than 40% runtime reduction achieved by deeper memory model understanding.
+I've tried to make the talk rather pragmatic, so you can get a common sense of performance benefits along with safety issues.
+For this talk you'll need to have basic knowledge of GPGPU programming. 
+
+Agenda:
+- Welcome message
+- The talk
+- Post meetup discussions
+
