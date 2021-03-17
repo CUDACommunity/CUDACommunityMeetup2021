@@ -1,0 +1,14 @@
+#!/bin/bash
+
+first_to_shift="$1"
+last=21
+for ((i=$last;i>=$first_to_shift;i--)); do
+	original_file=$(printf "%02d.cu" $i)
+	shifted_file=$(printf "%02d.cu" $((i+1)) )
+	[[ -r  $original_file ]] || continue
+	if [[ -r  $shifted_file ]]; then
+		echo "Can't overwrite existing files - giving up" 2>&1
+		exit -1
+	fi
+	mv $original_file $shifted_file
+done

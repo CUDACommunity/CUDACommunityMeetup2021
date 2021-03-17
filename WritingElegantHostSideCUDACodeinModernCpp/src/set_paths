@@ -1,0 +1,11 @@
+# Source this, don't run it.
+
+export CUDA_PATH="/usr/local/cuda"
+export CUDA_LIB_PATH="$CUDA_PATH/lib64"
+export LD_LIBRARY_PATH="$CUDA_LIB_PATH:$LD_LIBRARY_PATH"
+export PATH="$CUDA_PATH/bin:$PATH"
+
+# Remove duplicates
+
+export PATH=$(echo "$PATH" | awk -v RS=':' -v ORS=":" '!a[$1]++{if (NR > 1) printf ORS; printf $a[$1]}')
+export LD_LIBRARY_PATH=$(echo "$LD_LIBRARY_PATH" | awk -v RS=':' -v ORS=":" '!a[$1]++{if (NR > 1) printf ORS; printf $a[$1]}')

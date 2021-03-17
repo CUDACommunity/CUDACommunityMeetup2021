@@ -1,0 +1,4 @@
+#!/bin/bash
+
+objdump -C -t ${1} | sed -r '/\\*UND\\*/!d; s/000+\s+\*UND\*\s+000+ //;' | sort
+

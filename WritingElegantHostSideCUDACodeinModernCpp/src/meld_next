@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if (( "$#" != 1 )); then
+	echo >&2  "Usage: $0 <two-digit index>" 
+	exit -1
+fi
+base_filename="${1/\.cu/}"
+base_filename=$(bc<<<$base_filename) # remove leading zeros
+original_file="$(printf "%02d.cu" $base_filename)"
+modified_file="$(printf "%02d.cu" $((base_filename+1)) )"
+[[ -r "$original_file" ]] && [[ -r "$modified_file" ]] && meld $original_file $modified_file

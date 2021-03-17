@@ -1,0 +1,15 @@
+01  Original
+02  Removed printing instructions
+03  Moved code we won't be touching to a separate file
+04  Switch to C++ conventions regarding main function 
+05  Host-side memory allocation with std::make_unique
+06  Device-side allocation with cuda::memory::device::make_unique
+07  Copying data to and from the GPU with cuda::memory::copy, and zeroing with cuda::memory::zero
+08  Setting a launch config and launching with the launch mechanism
+09  no longer need a cudaError_t variable
+10  Using std::generate_n - no more loops
+11  Using a div_rounding_up() function
+12  Using <random> facilities instead of C-style rand()
+13  Dropped all comments - the code is now self-explanatory
+14  Scheduling the kernel on an asynchronous stream
+15  Using a pair of events to time kernel execution

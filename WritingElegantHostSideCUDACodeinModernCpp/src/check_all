@@ -1,0 +1,12 @@
+#!/bin/bash
+if [[ -n "$1" ]]; then
+	last_index_to_check="$1"
+else
+	last_index_to_check=$(ls *.cu | grep -E '[0-9][0-9].cu' | sort -n | tail -1 | cut -c1-2)
+fi
+. ./set_paths
+for ((i=1;i<=$last_index_to_check;i++)); do 
+	echo "Checking version" $(printf "%02d" $i)
+	make $(printf "v%02d" $i) >/dev/null && make >/dev/null && ./vectorAdd >/dev/null || echo "vectorAdd failed for version $(printf "v%02d" $i)." 2>&1; 
+done
+
